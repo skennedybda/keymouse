@@ -12,7 +12,7 @@ Workspace) that capture the keyboard and swallow desktop shortcuts.
 ### Debian / Ubuntu (.deb)
 
 ```sh
-sudo apt install ./keymouse_1.0.0_all.deb
+sudo apt install ./keymouse_1.0.1_all.deb
 ```
 
 `apt` pulls in the dependencies (`python3-evdev`, `python3-pyqt6`).
@@ -20,8 +20,8 @@ sudo apt install ./keymouse_1.0.0_all.deb
 ### Any distribution (tarball)
 
 ```sh
-tar xzf keymouse-1.0.0.tar.gz
-cd keymouse-1.0.0
+tar xzf keymouse-1.0.1.tar.gz
+cd keymouse-1.0.1
 sudo ./install.sh            # installs to /usr/local
 ```
 
@@ -100,6 +100,33 @@ The settings window shows a warning if the access is missing.
 | Flat pointer acceleration | ✓ (KWin) | the desktop's own setting applies |
 | Tray icon | ✓ | needs a tray (e.g. the AppIndicator extension on GNOME) |
 
+## Why no Snap or Flatpak?
+
+keymouse is packaged as a `.deb` and a tarball only, on purpose. Snap and
+Flatpak run apps in a sandbox that keeps them away from hardware, and
+keymouse's whole job is hardware access: it reads the keyboard devices
+directly and creates a kernel virtual mouse. That is what lets it work inside
+remote-desktop windows that capture the keyboard. Each format also leaves out
+two things keymouse has to install on the host:
+
+- **The udev rule** (`70-keymouse.rules`) that lets the logged-in user read
+  the keyboards and use `/dev/uinput`. Neither format can install udev rules,
+  so users would need a separate manual step as root, which defeats the point
+  of a one-step install.
+- **Flatpak** can open up raw device access (`--device=all`), but it cannot
+  install the systemd user service that runs the daemon at login. A
+  sandboxed app that reads every keystroke is also unlikely to be accepted on
+  Flathub.
+- **Snap** has interfaces for raw input and for uinput, and snaps can run
+  user services. But the uinput interface is privileged, so it needs manual
+  Snap Store review or users connecting it by hand. Classic (unconfined)
+  confinement would also need Store approval, and snaps are mainly used on
+  Ubuntu.
+
+Native packages can install the rule and the service properly, so they are
+the supported route. An `.rpm` (Fedora/openSUSE) or an AUR package (Arch)
+would fit the same way. Contributions are welcome.
+
 ## Safety
 
 - Mouse mode switches off while the screen is locked and can't be switched
@@ -127,4 +154,10 @@ packaging/build.sh       # runs the tests, then writes dist/*.tar.gz and dist/*.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+keymouse is free software, licensed under the **GNU General Public License,
+version 3 or (at your option) any later version** (GPL-3.0-or-later). See
+[LICENSE](LICENSE).
+
+You may use, study, share and change it. If you distribute a modified
+version, you must do so under the same license and make your source code
+available. It comes with no warranty.

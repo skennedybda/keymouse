@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Scott Kennedy
 # keymouse-toggle.sh [toggle|off|stop] -- for launchers and KDE shortcuts.
 # (Inside a Citrix window KDE shortcuts may not fire; the keyboard gesture,
 #  double-tap Right Shift by default, always does.)

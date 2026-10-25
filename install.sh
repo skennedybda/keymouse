@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Scott Kennedy
 # keymouse installer -- used as-is from the tarball, and by the .deb build.
 #
 #   sudo ./install.sh                  install to /usr/local (default)

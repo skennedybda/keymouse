@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Scott Kennedy
 # Build the release artifacts into dist/:
 #   keymouse-VERSION.tar.gz   source tarball (extract, then: sudo ./install.sh)
 #   keymouse_VERSION_all.deb  Debian/Ubuntu package
@@ -41,7 +43,24 @@ sed -e "s|@VERSION@|$VERSION|" -e "s|@MAINTAINER@|$MAINTAINER|" \
     packaging/debian/control.in > "$PKG/DEBIAN/control"
 install -m 0755 packaging/debian/postinst packaging/debian/postrm "$PKG/DEBIAN/"
 DOC=$PKG/usr/share/doc/keymouse
-install -m 0644 LICENSE "$DOC/copyright"
+cat > "$DOC/copyright" <<COPYRIGHT
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: keymouse
+Source: $HOMEPAGE
+
+Files: *
+Copyright: 2026 Scott Kennedy
+License: GPL-3.0-or-later
+ This program is free software: you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the Free
+ Software Foundation, either version 3 of the License, or (at your option)
+ any later version.
+ .
+ On Debian systems, the full text of the GNU General Public License
+ version 3 can be found in /usr/share/common-licenses/GPL-3.
+COPYRIGHT
+chmod 0644 "$DOC/copyright"
+rm -f "$DOC/LICENSE"      # the full text is already on every Debian system
 printf 'keymouse (%s) unstable; urgency=low\n\n  * Release %s.\n\n -- %s  %s\n' \
     "$VERSION" "$VERSION" "$MAINTAINER" "$(date -R)" | gzip -9n > "$DOC/changelog.Debian.gz"
 (cd "$PKG" && find usr -type f -exec md5sum {} + | sort -k2) > "$PKG/DEBIAN/md5sums"

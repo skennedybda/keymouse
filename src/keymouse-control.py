@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Scott Kennedy
 """Front end for keymouse, the keyboard-driven mouse daemon (keymouse.service).
 
 Turns mouse mode on and off, starts/stops the service, sets autostart,
@@ -30,7 +32,7 @@ from PyQt6.QtWidgets import (
 )
 
 UNIT = "keymouse.service"
-VERSION = "1.0.0"   # keep in step with keymouse.py
+VERSION = "1.0.1"   # keep in step with keymouse.py
 CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
 CONF = os.path.join(CONFIG_HOME, "keymouse.conf")
 UDEV_DATA = "/run/udev/data"

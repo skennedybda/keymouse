@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Scott Kennedy
 """keymouse -- drive the mouse pointer from the keyboard.
 
 Works *below* the compositor, which is what makes it survive remote desktop
@@ -71,7 +73,7 @@ import time
 import evdev
 from evdev import ecodes as e
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
 CONF = os.path.join(CONFIG_HOME, "keymouse.conf")
