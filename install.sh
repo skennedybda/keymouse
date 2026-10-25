@@ -108,6 +108,7 @@ put 0644 data/70-keymouse.rules      "$UDEVDIR/70-keymouse.rules"
 put 0644 data/keymouse-modules.conf  "$MODDIR/keymouse.conf"
 put 0644 README.md                   "$DOCDIR/README.md"
 put 0644 data/keymouse.conf.example  "$DOCDIR/keymouse.conf.example"
+put 0644 LICENSE                     "$DOCDIR/LICENSE"
 
 mkdir -p "$DESTDIR$DATADIR"
 printf '%s' "$INSTALLED" > "$DESTDIR$MANIFEST"

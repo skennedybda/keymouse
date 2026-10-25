@@ -25,8 +25,7 @@ mkdir -p build dist
 # ---- tarball --------------------------------------------------------------
 NAME=keymouse-$VERSION
 mkdir -p "build/$NAME"
-cp -r README.md install.sh src data tests "build/$NAME/"
-[ -f LICENSE ] && cp LICENSE "build/$NAME/"
+cp -r README.md LICENSE install.sh src data tests "build/$NAME/"
 find "build/$NAME" -name __pycache__ -prune -exec rm -rf {} +
 tar -C build --owner=0 --group=0 --sort=name -czf "dist/$NAME.tar.gz" "$NAME"
 
@@ -42,12 +41,7 @@ sed -e "s|@VERSION@|$VERSION|" -e "s|@MAINTAINER@|$MAINTAINER|" \
     packaging/debian/control.in > "$PKG/DEBIAN/control"
 install -m 0755 packaging/debian/postinst packaging/debian/postrm "$PKG/DEBIAN/"
 DOC=$PKG/usr/share/doc/keymouse
-if [ -f LICENSE ]; then
-    install -m 0644 LICENSE "$DOC/copyright"
-else
-    printf 'keymouse\nCopyright %s %s\nAll rights reserved (no license chosen yet).\n' \
-        "$(date +%Y)" "$MAINTAINER" > "$DOC/copyright"
-fi
+install -m 0644 LICENSE "$DOC/copyright"
 printf 'keymouse (%s) unstable; urgency=low\n\n  * Release %s.\n\n -- %s  %s\n' \
     "$VERSION" "$VERSION" "$MAINTAINER" "$(date -R)" | gzip -9n > "$DOC/changelog.Debian.gz"
 (cd "$PKG" && find usr -type f -exec md5sum {} + | sort -k2) > "$PKG/DEBIAN/md5sums"

@@ -124,3 +124,7 @@ journalctl --user -u keymouse.service -n 50
 ```sh
 packaging/build.sh       # runs the tests, then writes dist/*.tar.gz and dist/*.deb
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE).
