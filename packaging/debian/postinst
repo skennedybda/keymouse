@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    modprobe uinput 2>/dev/null || true
+    if command -v udevadm >/dev/null; then
+        udevadm control --reload-rules || true
+        udevadm trigger --action=change --subsystem-match=input --subsystem-match=misc || true
+    fi
+    echo "keymouse: open \"Keyboard Mouse\" from the application menu and press Start."
+fi
+exit 0

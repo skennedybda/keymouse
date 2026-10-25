@@ -35,13 +35,25 @@ Mouse mode
     Leave ........... Esc, or the toggle gesture again
 
 Control: SIGUSR1 toggles, SIGUSR2 forces mouse mode off, SIGHUP reloads
-~/.config/keymouse.conf, SIGTERM exits cleanly (releasing every grab).
+$XDG_CONFIG_HOME/keymouse.conf (~/.config), SIGTERM exits cleanly
+(releasing every grab).
+
+Desktop support: anything with systemd and a Wayland or X11 session. D-Bus
+is spoken through busctl (part of systemd), so no desktop-specific tools are
+needed. On KDE Plasma the mode message is a Plasma OSD and the pointer gets a
+flat acceleration profile; elsewhere a standard desktop notification is used
+and the compositor's own acceleration applies.
+
+Permissions: the user needs read access to /dev/input/event* keyboards and
+write access to /dev/uinput -- the packaged udev rule (70-keymouse.rules)
+grants both to the logged-in seat user.
 State: $XDG_RUNTIME_DIR/keymouse.state holds "off" or "mouse" while running.
 
-Safeguards (same failure shape as the vboard/TouchpadEmulator grabs):
+Safeguards:
   * Mouse mode is dropped while the screen is locked, and cannot be entered
     while it is locked -- a grabbed keyboard would make the password field
-    unreachable.
+    unreachable. The lock is read from logind's LockedHint (set by KDE,
+    GNOME and most lockers) and from org.freedesktop.ScreenSaver.
   * A watchdog thread releases the grabs if the main loop stalls.
   * The grab is only taken once no key is physically held, so the compositor
     can never be left with a stuck key it saw pressed but never released.
@@ -59,7 +71,10 @@ import time
 import evdev
 from evdev import ecodes as e
 
-CONF = os.path.expanduser("~/.config/keymouse.conf")
+__version__ = "1.0.0"
+
+CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+CONF = os.path.join(CONFIG_HOME, "keymouse.conf")
 RUNTIME = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
 STATE = os.path.join(RUNTIME, "keymouse.state")
 
@@ -243,55 +258,102 @@ def write_state(value):
         pass
 
 
-def session_locked():
-    """True/False, or None when the screen locker cannot be asked."""
+def busctl(*args, system=False, timeout=1.5):
+    """Run busctl; return stdout, or None if it failed or is missing."""
+    cmd = ["busctl", "--system" if system else "--user", *args]
     try:
-        out = subprocess.run(
-            ["qdbus6", "org.freedesktop.ScreenSaver", "/ScreenSaver",
-             "org.freedesktop.ScreenSaver.GetActive"],
-            capture_output=True, text=True, timeout=1.5,
-        ).stdout.strip()
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.SubprocessError):
         return None
-    return {"true": True, "false": False}.get(out)
+    return p.stdout.strip() if p.returncode == 0 else None
+
+
+def has_bus_name(name):
+    return busctl("status", name) is not None
+
+
+def parse_bool(out):
+    """busctl prints a boolean as 'b true' / 'b false'."""
+    return {"b true": True, "b false": False}.get(out)
+
+
+LOGIN1 = "org.freedesktop.login1"
+_session_path = None
+
+
+def logind_locked():
+    """LockedHint of this user's graphical session (desktop-neutral)."""
+    global _session_path
+    if _session_path is None:
+        out = busctl("get-property", LOGIN1, "/org/freedesktop/login1/user/self",
+                     "org.freedesktop.login1.User", "Display", system=True)
+        # '(so) "3" "/org/freedesktop/login1/session/_33"'
+        parts = out.split('"') if out else []
+        if len(parts) < 4 or not parts[3].startswith("/"):
+            return None
+        _session_path = parts[3]
+    value = parse_bool(busctl("get-property", LOGIN1, _session_path,
+                              "org.freedesktop.login1.Session", "LockedHint",
+                              system=True))
+    if value is None:
+        _session_path = None    # session went away; look it up again next time
+    return value
+
+
+def screensaver_locked():
+    return parse_bool(busctl("call", "org.freedesktop.ScreenSaver", "/ScreenSaver",
+                             "org.freedesktop.ScreenSaver", "GetActive"))
+
+
+def session_locked():
+    """True if any source says locked; False if one answered; None if none did."""
+    answers = [logind_locked(), screensaver_locked()]
+    if True in answers:
+        return True
+    return False if False in answers else None
 
 
 def osd(text, icon="input-mouse"):
-    try:
-        subprocess.Popen(
-            ["qdbus6", "org.kde.plasmashell", "/org/kde/osdService",
-             "org.kde.osdService.showText", icon, text],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-    except OSError:
-        pass
+    """Plasma OSD where available, otherwise a transient desktop notification."""
+    def show():
+        if has_bus_name("org.kde.plasmashell"):
+            if busctl("call", "org.kde.plasmashell", "/org/kde/osdService",
+                      "org.kde.osdService", "showText", "ss", icon, text) is not None:
+                return
+        busctl("call", "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+               "org.freedesktop.Notifications", "Notify", "susssasa{sv}i",
+               "Keyboard Mouse", "0", icon, text, "", "0",
+               "1", "transient", "b", "true", "1500")
+    threading.Thread(target=show, daemon=True).start()
 
 
 def set_flat_accel(event_path):
-    """Best effort: KWin's adaptive profile would distort our own speeds."""
+    """KWin only, best effort: its adaptive profile would distort our speeds."""
+    if not has_bus_name("org.kde.KWin"):
+        return
     node = os.path.basename(event_path)
     obj = f"/org/kde/KWin/InputDevice/{node}"
     for _ in range(20):
-        r = subprocess.run(
-            ["qdbus6", "org.kde.KWin", obj, "org.freedesktop.DBus.Properties.Set",
-             "org.kde.KWin.InputDevice", "pointerAccelerationProfileFlat", "true"],
-            capture_output=True, text=True, timeout=3,
-        )
-        if r.returncode == 0:
-            subprocess.run(
-                ["qdbus6", "org.kde.KWin", obj, "org.freedesktop.DBus.Properties.Set",
-                 "org.kde.KWin.InputDevice", "pointerAcceleration", "0"],
-                capture_output=True, timeout=3,
-            )
+        if busctl("set-property", "org.kde.KWin", obj, "org.kde.KWin.InputDevice",
+                  "pointerAccelerationProfileFlat", "b", "true", timeout=3) is not None:
+            busctl("set-property", "org.kde.KWin", obj, "org.kde.KWin.InputDevice",
+                   "pointerAcceleration", "d", "0", timeout=3)
             log(f"flat pointer acceleration set on {node}")
             return
         time.sleep(0.5)
     log(f"could not set flat acceleration on {node} (KWin never adopted it?)")
 
 
+PERMISSION_HINT = (
+    "keymouse needs read access to keyboards (/dev/input/event*) and write "
+    "access to /dev/uinput. Install the udev rule (70-keymouse.rules, part of "
+    "the package), then log out and back in.")
+
+
 class KeyMouse:
     def __init__(self):
         self.cfg = load_config()
+        self.denied = set()          # keyboard nodes we could not open
         self.sel = selectors.DefaultSelector()
         self.devices = {}            # path -> InputDevice
         self.mouse_mode = False
@@ -300,6 +362,15 @@ class KeyMouse:
         self.heartbeat = time.monotonic()
         self.lock = threading.Lock()  # guards grab/ungrab against the watchdog
 
+        try:
+            self.make_uinput()
+        except (OSError, evdev.UInputError) as exc:
+            log(f"cannot create virtual devices: {exc}")
+            log(PERMISSION_HINT)
+            raise SystemExit(78)     # EX_CONFIG: the unit does not restart-loop on it
+        self.finish_init()
+
+    def make_uinput(self):
         self.pointer = evdev.UInput(
             {
                 e.EV_KEY: [e.BTN_LEFT, e.BTN_RIGHT, e.BTN_MIDDLE],
@@ -312,6 +383,8 @@ class KeyMouse:
             name=PASSTHRU_NAME, vendor=0x1209, product=0x4b4e, version=1,
         )
         log(f"pointer {self.pointer.device.path}, passthrough {self.passthru.device.path}")
+
+    def finish_init(self):
         if self.cfg["flat_accel"]:
             threading.Thread(target=set_flat_accel, args=(self.pointer.device.path,),
                              daemon=True).start()
@@ -350,6 +423,11 @@ class KeyMouse:
         for path in present - set(self.devices):
             try:
                 dev = evdev.InputDevice(path)
+            except PermissionError:
+                if path not in self.denied:
+                    self.denied.add(path)
+                    log(f"no permission to read {path}")
+                continue
             except OSError:
                 continue
             if not is_keyboard(dev):
@@ -678,8 +756,13 @@ class KeyMouse:
         write_state("off")
         sd_notify("READY=1")
         next_ping = 0.0
-        log(f"ready; toggle = {self.cfg['toggle_style']} "
+        log(f"keymouse {__version__} ready; toggle = {self.cfg['toggle_style']} "
             f"{e.KEY.get(self.cfg['toggle_key'])}")
+        self.rescan()
+        self.next_rescan = time.monotonic() + RESCAN_SECS
+        if not self.devices:
+            log("WARNING: no keyboard could be opened, the toggle will not work. "
+                + PERMISSION_HINT)
 
         while True:
             now = time.monotonic()
@@ -749,6 +832,9 @@ class KeyMouse:
 
 
 def main():
+    if "--version" in sys.argv:
+        print(__version__)
+        return 0
     km = KeyMouse()
     try:
         km.run()

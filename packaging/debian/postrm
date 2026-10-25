@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+    if command -v udevadm >/dev/null; then
+        udevadm control --reload-rules || true
+        udevadm trigger --action=change --subsystem-match=input --subsystem-match=misc || true
+    fi
+fi
+exit 0

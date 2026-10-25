@@ -1,0 +1,10 @@
+# keymouse: let the user logged in at the seat read keyboards and create the
+# virtual pointer. "uaccess" is systemd-logind's per-session ACL: it is granted
+# only to the active local session's user and revoked when they switch away or
+# log out -- no group membership, nothing for remote/SSH users.
+#
+# Trade-off: any program that user runs can also read keystrokes from these
+# devices (that is what keymouse itself needs). Remove this file to revoke.
+# Must sort before 73-seat-late.rules, which turns the tag into an ACL.
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"

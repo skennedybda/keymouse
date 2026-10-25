@@ -1,0 +1,25 @@
+[Desktop Entry]
+Type=Application
+Name=Keyboard Mouse
+GenericName=Keyboard-driven mouse
+Comment=Move the pointer and click with the keyboard (works inside remote desktops such as Citrix)
+Exec=@BINDIR@/keymouse-control
+Icon=input-mouse
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=mouse;keys;keyboard;pointer;cursor;click;citrix;accessibility;
+StartupNotify=true
+StartupWMClass=keymouse-control
+Actions=Toggle;Off;Tray;
+
+[Desktop Action Toggle]
+Name=Toggle mouse mode
+Exec=@BINDIR@/keymouse-toggle toggle
+
+[Desktop Action Off]
+Name=Mouse mode off
+Exec=@BINDIR@/keymouse-toggle off
+
+[Desktop Action Tray]
+Name=Run in system tray
+Exec=@BINDIR@/keymouse-control --tray

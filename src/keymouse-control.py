@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Front end for keymouse (keyboard-driven mouse, ~/.local/bin/keymouse.py).
+"""Front end for keymouse, the keyboard-driven mouse daemon (keymouse.service).
 
 Turns mouse mode on and off, starts/stops the service, sets autostart,
-and edits ~/.config/keymouse.conf (the service reloads it on SIGHUP, so
+and edits $XDG_CONFIG_HOME/keymouse.conf (the service reloads it on SIGHUP, so
 changes apply immediately -- no restart).
 
 State comes from $XDG_RUNTIME_DIR/keymouse.state ("off" / "mouse", removed
@@ -30,7 +30,10 @@ from PyQt6.QtWidgets import (
 )
 
 UNIT = "keymouse.service"
-CONF = os.path.expanduser("~/.config/keymouse.conf")
+VERSION = "1.0.0"   # keep in step with keymouse.py
+CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+CONF = os.path.join(CONFIG_HOME, "keymouse.conf")
+UDEV_DATA = "/run/udev/data"
 STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "keymouse.state")
 
 TOUCH_HEIGHT = 42
@@ -278,6 +281,36 @@ def write_conf(updates):
     return True
 
 
+def access_problems():
+    """What stops the daemon working on this machine, as plain sentences.
+
+    Keyboards are recognised from udev's database (ID_INPUT_KEYBOARD), so
+    nothing is opened -- this is cheap enough to run on every Start.
+    """
+    problems = []
+    if not os.access("/dev/uinput", os.W_OK):
+        problems.append("cannot create the virtual mouse (/dev/uinput)")
+    keyboards = readable = 0
+    try:
+        nodes = [n for n in os.listdir("/dev/input") if n.startswith("event")]
+    except OSError:
+        nodes = []
+    for node in nodes:
+        path = os.path.join("/dev/input", node)
+        try:
+            rdev = os.stat(path).st_rdev
+            with open(f"{UDEV_DATA}/c{os.major(rdev)}:{os.minor(rdev)}") as f:
+                if "E:ID_INPUT_KEYBOARD=1" not in f.read():
+                    continue
+        except OSError:
+            continue
+        keyboards += 1
+        readable += os.access(path, os.R_OK)
+    if keyboards and not readable:
+        problems.append("cannot read the keyboard")
+    return problems
+
+
 def muted(label):
     label.setWordWrap(True)
     label.setStyleSheet("color: palette(placeholder-text);")
@@ -310,6 +343,14 @@ class KeyMouseControl(QMainWindow):
         sl.addWidget(self.mode_label)
         self.detail_label = muted(QLabel("…"))
         sl.addWidget(self.detail_label)
+        self.access_label = QLabel()
+        self.access_label.setWordWrap(True)
+        self.access_label.setTextFormat(Qt.TextFormat.RichText)
+        self.access_label.setStyleSheet(
+            "background: palette(alternate-base); border-left: 4px solid #d9822b;"
+            " padding: 8px;")
+        self.access_label.hide()
+        sl.addWidget(self.access_label)
 
         self.toggle_btn = QPushButton("Turn Mouse Mode On")
         self.toggle_btn.setMinimumHeight(TOUCH_HEIGHT + 8)
@@ -453,6 +494,7 @@ class KeyMouseControl(QMainWindow):
             self.tray.show()
 
         self.load_settings()
+        self.check_access()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
         self.timer.start(1000)
@@ -564,6 +606,17 @@ class KeyMouseControl(QMainWindow):
             return
         systemctl("kill", "-s", "HUP", UNIT)
 
+    def check_access(self):
+        problems = access_problems()
+        if problems:
+            self.access_label.setText(
+                "<b>Keyboard access is not set up on this computer</b> — keymouse "
+                f"{' and '.join(problems)}.<br>Install it from the package or "
+                "<code>sudo ./install.sh</code> (both add the udev rule "
+                "<code>70-keymouse.rules</code>), then log out and back in.")
+        self.access_label.setVisible(bool(problems))
+        return not problems
+
     # -- actions ------------------------------------------------------
     def on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
@@ -575,6 +628,7 @@ class KeyMouseControl(QMainWindow):
         self.activateWindow()
 
     def on_toggle(self):
+        self.check_access()
         active, _ = unit_state()
         if not active:
             rc, _ = systemctl("start", UNIT)
@@ -589,6 +643,7 @@ class KeyMouseControl(QMainWindow):
         QTimer.singleShot(2000, self.refresh)
 
     def service(self, verb):
+        self.check_access()
         rc, _ = systemctl(verb, UNIT)
         if rc != 0:
             self.warn(f"Could not {verb} the service.\n\njournalctl --user -u {UNIT}")
@@ -642,6 +697,9 @@ class KeyMouseControl(QMainWindow):
 
 
 def main():
+    if "--version" in sys.argv:
+        print(VERSION)
+        return
     app = QApplication(sys.argv)
     app.setApplicationName("Keyboard Mouse")
     app.setDesktopFileName("keymouse-control")

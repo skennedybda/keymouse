@@ -1,0 +1,36 @@
+# keymouse settings: copy to ~/.config/keymouse.conf (or let the
+# Keyboard Mouse settings window create it). Reload a running daemon with
+#   systemctl --user kill -s HUP keymouse.service
+[keymouse]
+# Key that turns mouse mode on/off (an evdev KEY_* name), and how:
+#   double-tap = tap it twice quickly with no other key in between
+#   single     = one tap (only sensible for a key you never use, e.g. KEY_SCROLLLOCK)
+toggle_key = KEY_RIGHTSHIFT
+toggle_style = double-tap
+double_tap_ms = 400
+# Pointer speed in pixels per second: starting speed, top speed, and how
+# long a held key takes to reach top speed.
+speed = 250
+max_speed = 1600
+accel_ms = 900
+# Speed while Shift is held, as a percentage.
+slow_percent = 25
+# Wheel notches per second while a scroll key is held.
+scroll_per_sec = 12
+# Ask KWin for a flat acceleration profile on the virtual pointer (1/0).
+flat_accel = 1
+# Show an on-screen message when mouse mode turns on/off (1/0).
+osd = 1
+watchdog_secs = 6
+# Key assignments for mouse mode: evdev KEY_* names, space-separated (two per
+# action in the settings window). The arrow keys always move the pointer too.
+# Arrows, Esc, Shift/Ctrl/Alt/Meta and the toggle key cannot be assigned.
+# A key listed here stops doing its fixed job (W/S/A/D/PgUp/PgDn scroll,
+# Enter double-click, G drag lock). Defaults:
+move_up_keys = KEY_I
+move_down_keys = KEY_K
+move_left_keys = KEY_J
+move_right_keys = KEY_L
+left_click_keys = KEY_SPACE KEY_F
+right_click_keys = KEY_R KEY_COMPOSE
+middle_click_keys = KEY_M

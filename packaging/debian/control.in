@@ -1,0 +1,19 @@
+Package: keymouse
+Version: @VERSION@
+Architecture: all
+Maintainer: @MAINTAINER@
+Installed-Size: @SIZE@
+Depends: python3 (>= 3.9), python3-evdev, python3-pyqt6, systemd, udev
+Section: utils
+Priority: optional
+Homepage: @HOMEPAGE@
+Description: move and click the mouse pointer from the keyboard
+ keymouse turns the keyboard into a mouse: arrow keys (and assignable keys)
+ move the pointer, other keys click, drag and scroll. A double-tap of Right
+ Shift switches mouse mode on and off.
+ .
+ Keys are read below the compositor and the pointer is a kernel virtual
+ device, so it keeps working inside remote-desktop clients (such as Citrix
+ Workspace) that capture the keyboard. Includes a touch-friendly settings
+ window with a tray icon, and a udev rule granting the logged-in user access
+ to keyboards and /dev/uinput.

@@ -1,0 +1,25 @@
+[Unit]
+Description=keymouse: move and click the mouse from the keyboard
+Documentation=file://@DOCDIR@/README.md
+PartOf=graphical-session.target
+After=graphical-session.target
+# A missing udev rule makes the daemon exit 78 (see RestartPreventExitStatus);
+# anything else that keeps failing gives up after 5 tries in a minute.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=notify
+ExecStart=@BINDIR@/keymouse
+# The main loop pings every 2 s. If the process ever freezes while it holds
+# the keyboard grab, systemd kills it and the kernel releases the keyboards.
+WatchdogSec=10
+NotifyAccess=main
+KillSignal=SIGTERM
+TimeoutStopSec=5
+Restart=on-failure
+RestartSec=3
+RestartPreventExitStatus=78
+
+[Install]
+WantedBy=graphical-session.target
