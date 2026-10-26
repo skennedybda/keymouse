@@ -16,4 +16,4 @@ Description: move and click the mouse pointer from the keyboard
  device, so it keeps working inside remote-desktop clients (such as Citrix
  Workspace) that capture the keyboard. Includes a touch-friendly settings
  window with a tray icon, and a udev rule granting the logged-in user access
- to keyboards and /dev/uinput.
+ to the keyboards and to virtual input devices.

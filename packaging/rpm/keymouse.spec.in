@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+Name:           keymouse
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        Move and click the mouse pointer from the keyboard
+License:        GPL-3.0-or-later
+URL:            @HOMEPAGE@
+Source0:        %{name}-%{version}.tar.gz
+BuildArch:      noarch
+
+BuildRequires:  systemd-rpm-macros
+Requires:       python3 >= 3.9
+Requires:       python3-evdev
+Requires:       python3-pyqt6
+Requires:       systemd
+Requires:       systemd-udev
+
+%description
+keymouse turns the keyboard into a mouse: arrow keys (and assignable keys)
+move the pointer, other keys click, drag and scroll. A double-tap of Right
+Shift switches mouse mode on and off.
+
+Keys are read below the compositor and the pointer is a kernel virtual
+device, so it keeps working inside remote-desktop clients (such as Citrix
+Workspace) that capture the keyboard. Includes a touch-friendly settings
+window with a tray icon, and a udev rule granting the logged-in user access
+to the keyboards and to virtual input devices.
+
+%prep
+%autosetup
+
+%build
+# Nothing to build: plain Python and shell scripts.
+
+%install
+./install.sh --prefix %{_prefix} --destdir %{buildroot}
+# rpm keeps its own file list, and ships the license via %%license.
+rm %{buildroot}%{_datadir}/keymouse/installed-files
+rmdir %{buildroot}%{_datadir}/keymouse
+rm %{buildroot}%{_docdir}/keymouse/LICENSE
+
+%post
+modprobe uinput 2>/dev/null || :
+udevadm control --reload-rules 2>/dev/null || :
+udevadm trigger --action=change --subsystem-match=input --subsystem-match=misc 2>/dev/null || :
+if [ "$1" -eq 1 ]; then
+    echo 'keymouse: open "Keyboard Mouse" from the application menu and press Start.'
+fi
+
+%postun
+udevadm control --reload-rules 2>/dev/null || :
+udevadm trigger --action=change --subsystem-match=input --subsystem-match=misc 2>/dev/null || :
+
+%files
+%license LICENSE
+%doc %{_docdir}/keymouse/README.md
+%doc %{_docdir}/keymouse/keymouse.conf.example
+%{_bindir}/keymouse
+%{_bindir}/keymouse-control
+%{_bindir}/keymouse-toggle
+%{_userunitdir}/keymouse.service
+%{_datadir}/applications/keymouse-control.desktop
+%{_udevrulesdir}/70-keymouse.rules
+%{_modulesloaddir}/keymouse.conf
+
+%changelog
+* @DATE@ Scott Kennedy <67512861+skennedybda@users.noreply.github.com> - @VERSION@-1
+- Release @VERSION@.

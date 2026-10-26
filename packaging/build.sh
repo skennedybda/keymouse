@@ -4,6 +4,9 @@
 # Build the release artifacts into dist/:
 #   keymouse-VERSION.tar.gz   source tarball (extract, then: sudo ./install.sh)
 #   keymouse_VERSION_all.deb  Debian/Ubuntu package
+#   keymouse-VERSION-1.noarch.rpm  Fedora (and other rpm/dnf) package, built
+#                             with rpmbuild if installed, else in a Fedora
+#                             container (docker or podman); SKIP_RPM=1 skips
 # Runs the test suite first; set SKIP_TESTS=1 to skip it.
 # MAINTAINER and HOMEPAGE override the .deb metadata.
 set -eu
@@ -65,6 +68,32 @@ printf 'keymouse (%s) unstable; urgency=low\n\n  * Release %s.\n\n -- %s  %s\n' 
     "$VERSION" "$VERSION" "$MAINTAINER" "$(date -R)" | gzip -9n > "$DOC/changelog.Debian.gz"
 (cd "$PKG" && find usr -type f -exec md5sum {} + | sort -k2) > "$PKG/DEBIAN/md5sums"
 dpkg-deb --root-owner-group -Zxz --build "$PKG" "dist/keymouse_${VERSION}_all.deb" >/dev/null
+
+# ---- .rpm -----------------------------------------------------------------
+if [ "${SKIP_RPM:-0}" != 1 ]; then
+    RPM=build/rpm
+    mkdir -p "$RPM/SOURCES" "$RPM/SPECS"
+    cp "dist/$NAME.tar.gz" "$RPM/SOURCES/"
+    sed -e "s|@VERSION@|$VERSION|g" -e "s|@HOMEPAGE@|$HOMEPAGE|" \
+        -e "s|@DATE@|$(LC_ALL=C date '+%a %b %d %Y')|" \
+        packaging/rpm/keymouse.spec.in > "$RPM/SPECS/keymouse.spec"
+    # No dist tag: a noarch package with only name-based dependencies installs
+    # on any current Fedora, so the file name should not claim one release.
+    RPMBUILD='rpmbuild --quiet --define "dist %{nil}" --define "_topdir /rpm" -bb /rpm/SPECS/keymouse.spec'
+    ENGINE=$(command -v podman || command -v docker || true)
+    if command -v rpmbuild >/dev/null; then
+        rpmbuild --quiet --define "dist %{nil}" --define "_topdir $ROOT/$RPM" \
+            -bb "$RPM/SPECS/keymouse.spec"
+    elif [ -n "$ENGINE" ]; then
+        "$ENGINE" run --rm -v "$ROOT/$RPM:/rpm:Z" "fedora:${FEDORA_RELEASE:-latest}" sh -ec "
+            dnf -q -y install rpm-build systemd-rpm-macros >/dev/null 2>&1
+            $RPMBUILD
+            chown -R $(id -u):$(id -g) /rpm"
+    else
+        echo "no rpmbuild, podman or docker: skipping the .rpm" >&2
+    fi
+    cp "$RPM"/RPMS/noarch/*.rpm dist/ 2>/dev/null || true
+fi
 
 (cd dist && sha256sum -- * > SHA256SUMS)
 echo "built:"; ls -l dist

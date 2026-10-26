@@ -17,6 +17,16 @@ sudo apt install ./keymouse_1.0.1_all.deb
 
 `apt` pulls in the dependencies (`python3-evdev`, `python3-pyqt6`).
 
+### Fedora (.rpm)
+
+```sh
+sudo dnf install ./keymouse-1.0.1-1.noarch.rpm
+```
+
+`dnf` pulls in the dependencies (`python3-evdev`, `python3-pyqt6`). Tested on
+Fedora 44; it should also work on other dnf/rpm distributions that use the
+same package names.
+
 ### Any distribution (tarball)
 
 ```sh
@@ -149,8 +159,11 @@ journalctl --user -u keymouse.service -n 50
 ## Building
 
 ```sh
-packaging/build.sh       # runs the tests, then writes dist/*.tar.gz and dist/*.deb
+packaging/build.sh       # runs the tests, then writes dist/*.tar.gz, *.deb and *.rpm
 ```
+
+The `.rpm` is built with `rpmbuild` if it is installed, otherwise inside a
+Fedora container (podman or docker). `SKIP_RPM=1` skips it.
 
 ## License
 
